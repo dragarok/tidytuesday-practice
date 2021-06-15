@@ -1,0 +1,879 @@
+#+STARTUP: fold
+#+TITLE: Tidytuesday_05_25_21
+#+attr_org: :width 720 :height 600
+#+PROPERTY: eval no
+
+* Loading the data locally
+
+If you haven't downloaded the data using the last block of code in this notebook, do this first. Since, everytime we execute upto point, it executes all cells in the process, I decided to put the downloaded one at the end. I am saving them to csv so that I can look at the data while working on the notebook side by side.
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t
+library("tidyverse")
+library("knitr")
+drivers <- read_csv("datasets/05_25_21_mario_kart/drivers.csv")
+records <- read_csv("datasets/05_25_21_mario_kart/records.csv")
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+── [1mAttaching packages[22m ─────────────────────────────────────── tidyverse 1.3.1 ──
+
+[32m✔[39m [34mggplot2[39m 3.3.3     [32m✔[39m [34mpurrr  [39m 0.3.4
+[32m✔[39m [34mtibble [39m 3.1.2     [32m✔[39m [34mdplyr  [39m 1.0.6
+[32m✔[39m [34mtidyr  [39m 1.1.3     [32m✔[39m [34mstringr[39m 1.4.0
+[32m✔[39m [34mreadr  [39m 1.4.0     [32m✔[39m [34mforcats[39m 0.5.1
+── [1mConflicts[22m ────────────────────────────────────────── tidyverse_conflicts() ──
+[31m✖[39m [34mdplyr[39m::[32mfilter()[39m masks [34mstats[39m::filter()
+[31m✖[39m [34mdplyr[39m::[32mlag()[39m    masks [34mstats[39m::lag()
+
+[36m──[39m [1m[1mColumn specification[1m[22m [36m────────────────────────────────────────────────────────[39m
+cols(
+  position = [32mcol_double()[39m,
+  player = [31mcol_character()[39m,
+  total = [32mcol_double()[39m,
+  year = [32mcol_double()[39m,
+  records = [32mcol_double()[39m,
+  nation = [31mcol_character()[39m
+)
+
+[36m──[39m [1m[1mColumn specification[1m[22m [36m────────────────────────────────────────────────────────[39m
+cols(
+  track = [31mcol_character()[39m,
+  type = [31mcol_character()[39m,
+  shortcut = [31mcol_character()[39m,
+  player = [31mcol_character()[39m,
+  system_played = [31mcol_character()[39m,
+  date = [34mcol_date(format = "")[39m,
+  time_period = [31mcol_character()[39m,
+  time = [32mcol_double()[39m,
+  record_duration = [32mcol_double()[39m
+)
+#+end_example
+* Basic data description
+So, we have two dataframes in this dataset. The record of drivers and world records.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t :exports both
+# drivers <- tuesdata$drivers
+head(drivers, 5)
+#+END_SRC
+
+#+RESULTS:
+
+And in drivers, we have position of driver, total world records, number of world records, his/her nationality and so on.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+# records <- tuesdata$records
+head(records, 5)
+#+END_SRC
+
+#+RESULTS:
+
+Now, in records we have the track, it's type, shortcut record or non-shortcut record, player and so on.
+Here, we have two systems : NTSC and PAL. They have different frame rates thus the records need to be adjusted to single time.
+
+* Data pre-processing
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+records$track <- factor(records$track)
+records$type <- factor(records$type)
+print(summary(records$track))
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+    Banshee Boardwalk       Bowser's Castle        Choco Mountain
+                   83                    69                   148
+D.K.'s Jungle Parkway       Frappe Snowland       Kalimari Desert
+                  180                   180                   169
+   Koopa Troopa Beach         Luigi Raceway         Mario Raceway
+                   89                   147                   160
+         Moo Moo Farm          Rainbow Road         Royal Raceway
+                   81                   179                   149
+         Sherbet Land       Toad's Turnpike         Wario Stadium
+                  143                   196                   201
+         Yoshi Valley
+                  160
+#+end_example
+
+* Questions to Explore
+
+** Who is the player with most world records right now? [ At the time of data ]
+
+   #+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+topPlayers <- records %>%
+  group_by(track, type, shortcut) %>%
+  filter(time==min(time)) %>%
+  ungroup() %>%
+  count(player) %>%
+  arrange(desc(n))
+topPlayers
+   #+END_SRC
+
+   #+RESULTS:
+   :RESULTS:
+   A tibble: 5 × 2
+
+   | player <chr> | n <int> |
+   |--------------+---------|
+   | Dan          | 29      |
+   | MR           | 21      |
+   | abney317     | 11      |
+   | VAJ          | 2       |
+   | iMathII      | 1       |
+   :END:
+
+   So, Dan has most number of records at the time being [ 29 ] and MR has 21.
+
+** Which is the longest standing world record?
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+recordsDays <-records %>%
+  mutate(recDays=Sys.Date()-date) %>%
+  group_by(track, type, shortcut) %>%
+  filter(date==max(date) & time==min(time))%>%
+  arrange(desc(recDays)) %>%
+  select(!record_duration)
+recordsDays
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+A grouped_df: 56 × 9
+
+| track <fct>           | type <fct> | shortcut <chr> | player <chr> | system_played <chr> | date <date> | time_period <chr> | time <dbl> | recDays <drtn> |
+|-----------------------+------------+----------------+--------------+---------------------+-------------+-------------------+------------+----------------|
+| Royal Raceway         | Three Lap  | Yes            | abney317     | PAL                 | 2016-07-31  | 1M 59.49S         | 119.49     | 1779 days      |
+| Frappe Snowland       | Three Lap  | No             | MR           | PAL                 | 2017-12-23  | 1M 59.95S         | 119.95     | 1269 days      |
+| Kalimari Desert       | Three Lap  | No             | MR           | PAL                 | 2018-04-20  | 2M 3.94S          | 123.94     | 1151 days      |
+| Moo Moo Farm          | Single Lap | No             | abney317     | PAL                 | 2018-12-29  | 27.8S             | 27.80      | 898 days       |
+| Wario Stadium         | Three Lap  | No             | MR           | PAL                 | 2019-10-11  | 4M 20.01S         | 260.01     | 612 days       |
+| Frappe Snowland       | Single Lap | No             | Dan          | PAL                 | 2019-12-25  | 38.27S            | 38.27      | 537 days       |
+| Frappe Snowland       | Single Lap | Yes            | Dan          | PAL                 | 2019-12-25  | 38.27S            | 38.27      | 537 days       |
+| D.K.'s Jungle Parkway | Three Lap  | No             | Dan          | PAL                 | 2019-12-31  | 2M 11.62S         | 131.62     | 531 days       |
+| Kalimari Desert       | Three Lap  | Yes            | abney317     | PAL                 | 2020-01-20  | 2M 1.92S          | 121.92     | 511 days       |
+| Moo Moo Farm          | Three Lap  | No             | MR           | PAL                 | 2020-02-18  | 1M 25.93S         | 85.93      | 482 days       |
+| D.K.'s Jungle Parkway | Three Lap  | Yes            | abney317     | PAL                 | 2020-02-25  | 21.35S            | 21.35      | 475 days       |
+| Royal Raceway         | Single Lap | No             | Dan          | PAL                 | 2020-06-11  | 55.5S             | 55.50      | 368 days       |
+| Royal Raceway         | Single Lap | Yes            | Dan          | PAL                 | 2020-06-11  | 55.5S             | 55.50      | 368 days       |
+| Koopa Troopa Beach    | Three Lap  | No             | Dan          | PAL                 | 2020-07-13  | 1M 35.25S         | 95.25      | 336 days       |
+| Choco Mountain        | Three Lap  | No             | MR           | PAL                 | 2020-07-14  | 1M 55.93S         | 115.93     | 335 days       |
+| Choco Mountain        | Single Lap | No             | MR           | PAL                 | 2020-07-17  | 38.02S            | 38.02      | 332 days       |
+| Choco Mountain        | Single Lap | Yes            | MR           | PAL                 | 2020-07-17  | 38.02S            | 38.02      | 332 days       |
+| Wario Stadium         | Three Lap  | Yes            | VAJ          | NTSC                | 2020-07-30  | 14.59S            | 14.59      | 319 days       |
+| Mario Raceway         | Three Lap  | No             | Dan          | PAL                 | 2020-08-13  | 1M 27.51S         | 87.51      | 305 days       |
+| Banshee Boardwalk     | Single Lap | No             | MR           | PAL                 | 2020-08-21  | 40.78S            | 40.78      | 297 days       |
+| Rainbow Road          | Single Lap | No             | MR           | PAL                 | 2020-09-04  | 1M 56.35S         | 116.35     | 283 days       |
+| Rainbow Road          | Single Lap | Yes            | MR           | PAL                 | 2020-09-04  | 1M 56.35S         | 116.35     | 283 days       |
+| Royal Raceway         | Three Lap  | No             | Dan          | PAL                 | 2020-09-07  | 2M 51.25S         | 171.25     | 280 days       |
+| Toad's Turnpike       | Single Lap | No             | Dan          | PAL                 | 2020-09-20  | 58.69S            | 58.69      | 267 days       |
+| Toad's Turnpike       | Single Lap | Yes            | Dan          | PAL                 | 2020-09-20  | 58.69S            | 58.69      | 267 days       |
+| Toad's Turnpike       | Three Lap  | No             | Dan          | PAL                 | 2020-09-28  | 2M 57.8S          | 177.80     | 259 days       |
+| Rainbow Road          | Three Lap  | No             | Dan          | PAL                 | 2020-09-28  | 5M 51.87S         | 351.87     | 259 days       |
+| Koopa Troopa Beach    | Single Lap | No             | Dan          | PAL                 | 2020-10-18  | 30.78S            | 30.78      | 239 days       |
+| D.K.'s Jungle Parkway | Single Lap | No             | Dan          | PAL                 | 2020-10-26  | 42.04S            | 42.04      | 231 days       |
+| D.K.'s Jungle Parkway | Single Lap | Yes            | Dan          | PAL                 | 2020-10-26  | 42.04S            | 42.04      | 231 days       |
+| Luigi Raceway         | Three Lap  | No             | Dan          | PAL                 | 2020-11-06  | 1M 57.77S         | 117.77     | 220 days       |
+| Kalimari Desert       | Single Lap | No             | Dan          | PAL                 | 2020-11-07  | 38.96S            | 38.96      | 219 days       |
+| Kalimari Desert       | Single Lap | Yes            | Dan          | PAL                 | 2020-11-07  | 38.96S            | 38.96      | 219 days       |
+| Sherbet Land          | Three Lap  | Yes            | abney317     | NTSC                | 2020-11-13  | 1M 31.65S         | 91.65      | 213 days       |
+| Yoshi Valley          | Single Lap | No             | Dan          | PAL                 | 2021-01-01  | 31.25S            | 31.25      | 164 days       |
+| Yoshi Valley          | Single Lap | Yes            | Dan          | PAL                 | 2021-01-01  | 31.25S            | 31.25      | 164 days       |
+| Frappe Snowland       | Three Lap  | Yes            | abney317     | PAL                 | 2021-01-08  | 23.61S            | 23.61      | 157 days       |
+| Banshee Boardwalk     | Three Lap  | No             | MR           | PAL                 | 2021-01-15  | 2M 4.09S          | 124.09     | 150 days       |
+| Yoshi Valley          | Three Lap  | Yes            | VAJ          | PAL                 | 2021-01-21  | 33.35S            | 33.35      | 144 days       |
+| Wario Stadium         | Single Lap | No             | Dan          | PAL                 | 2021-01-26  | 1M 25.82S         | 85.82      | 139 days       |
+| Wario Stadium         | Single Lap | Yes            | Dan          | PAL                 | 2021-01-26  | 1M 25.82S         | 85.82      | 139 days       |
+| Sherbet Land          | Three Lap  | No             | MR           | PAL                 | 2021-01-26  | 1M 55.15S         | 115.15     | 139 days       |
+| Yoshi Valley          | Three Lap  | No             | MR           | PAL                 | 2021-01-26  | 1M 42.13S         | 102.13     | 139 days       |
+| Bowser's Castle       | Three Lap  | No             | Dan          | PAL                 | 2021-02-02  | 2M 12S            | 132.00     | 132 days       |
+| Bowser's Castle       | Single Lap | No             | Dan          | PAL                 | 2021-02-02  | 43.15S            | 43.15      | 132 days       |
+| Choco Mountain        | Three Lap  | Yes            | abney317     | NTSC                | 2021-02-03  | 17.29S            | 17.29      | 131 days       |
+| Luigi Raceway         | Single Lap | No             | MR           | PAL                 | 2021-02-06  | 37.58S            | 37.58      | 128 days       |
+| Luigi Raceway         | Single Lap | Yes            | MR           | PAL                 | 2021-02-06  | 37.58S            | 37.58      | 128 days       |
+| Rainbow Road          | Three Lap  | Yes            | abney317     | NTSC                | 2021-02-07  | 50.38S            | 50.38      | 127 days       |
+| Luigi Raceway         | Three Lap  | Yes            | abney317     | NTSC                | 2021-02-11  | 25.3S             | 25.30      | 123 days       |
+| Toad's Turnpike       | Three Lap  | Yes            | iMathII      | NTSC                | 2021-02-14  | 30.31S            | 30.31      | 120 days       |
+| Sherbet Land          | Single Lap | No             | MR           | PAL                 | 2021-02-19  | 37.72S            | 37.72      | 115 days       |
+| Sherbet Land          | Single Lap | Yes            | MR           | PAL                 | 2021-02-19  | 37.72S            | 37.72      | 115 days       |
+| Mario Raceway         | Single Lap | No             | MR           | PAL                 | 2021-02-20  | 27.62S            | 27.62      | 114 days       |
+| Mario Raceway         | Single Lap | Yes            | MR           | PAL                 | 2021-02-20  | 27.62S            | 27.62      | 114 days       |
+| Mario Raceway         | Three Lap  | Yes            | abney317     | PAL                 | 2021-02-25  | 58.49S            | 58.49      | 109 days       |
+:END:
+
+All these records are based on today's date. 2021-06-14.
+** On which tracks do shortcut save the most time?
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+tracksShortestTime <- records %>%
+  select(track, shortcut, time) %>%
+  group_by(track, shortcut) %>%
+  ## mutate(minDate=min(date)) %>%
+  ## filter(date==minDate) %>%
+  filter(time==min(time)) %>%
+  ungroup() %>%
+  distinct()
+tracksShortestTime
+#+END_SRC
+
+#+RESULTS:
+#+begin_export markdown
+
+A tibble: 28 × 3
+
+| track &lt;fct&gt; | shortcut &lt;chr&gt; | time &lt;dbl&gt; |
+|---|---|---|
+| Luigi Raceway         | No  |  37.58 |
+| Luigi Raceway         | Yes |  25.30 |
+| Moo Moo Farm          | No  |  27.80 |
+| Koopa Troopa Beach    | No  |  30.78 |
+| Kalimari Desert       | No  |  38.96 |
+| Kalimari Desert       | Yes |  38.96 |
+| Toad's Turnpike       | No  |  58.69 |
+| Toad's Turnpike       | Yes |  30.31 |
+| Frappe Snowland       | No  |  38.27 |
+| Frappe Snowland       | Yes |  23.61 |
+| Choco Mountain        | No  |  38.02 |
+| Choco Mountain        | Yes |  17.29 |
+| Mario Raceway         | No  |  27.62 |
+| Mario Raceway         | Yes |  27.62 |
+| Wario Stadium         | No  |  85.82 |
+| Wario Stadium         | Yes |  14.59 |
+| Sherbet Land          | No  |  37.72 |
+| Sherbet Land          | Yes |  37.72 |
+| Royal Raceway         | No  |  55.50 |
+| Royal Raceway         | Yes |  55.50 |
+| Bowser's Castle       | No  |  43.15 |
+| D.K.'s Jungle Parkway | No  |  42.04 |
+| D.K.'s Jungle Parkway | Yes |  21.35 |
+| Yoshi Valley          | No  |  31.25 |
+| Yoshi Valley          | Yes |  31.25 |
+| Banshee Boardwalk     | No  |  40.78 |
+| Rainbow Road          | No  | 116.35 |
+| Rainbow Road          | Yes |  50.38 |
+#+end_export
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t
+tracksSavedTime <- tracksShortestTime %>%
+  group_by(track) %>%
+  mutate(diff=time - min(time)) %>%
+  filter(diff != 0) %>%
+  select(track, diff) %>%
+  arrange(desc(diff))
+tracksSavedTime
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+A grouped_df: 7 × 2
+
+| track <fct>           | diff <dbl> |
+|-----------------------+------------|
+| Wario Stadium         | 71.23      |
+| Rainbow Road          | 65.97      |
+| Toad's Turnpike       | 28.38      |
+| Choco Mountain        | 20.73      |
+| D.K.'s Jungle Parkway | 20.69      |
+| Frappe Snowland       | 14.66      |
+| Luigi Raceway         | 12.28      |
+:END:
+
+** When were the shortcuts discovered?
+
+The oldest date for which shortcuts were found is as follows:
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R
+shortcutTracks <- records %>%
+  select(track, shortcut, date) %>%
+  filter(shortcut=="Yes") %>%
+  group_by(track) %>%
+  ## mutate(minDate=min(date)) %>%
+  ## filter(date==minDate) %>%
+  filter(date==min(date)) %>%
+  ungroup() %>%
+  select(track, date)
+shortcutTracks
+#+END_SRC
+
+#+RESULTS:
+#+begin_export markdown
+
+A tibble: 12 × 2
+
+| track &lt;fct&gt; | date &lt;date&gt; |
+|---|---|
+| Luigi Raceway         | 1997-02-16 |
+| Kalimari Desert       | 1997-03-10 |
+| Toad's Turnpike       | 1997-03-10 |
+| Frappe Snowland       | 1997-03-10 |
+| Choco Mountain        | 1997-03-10 |
+| Mario Raceway         | 1997-03-10 |
+| Wario Stadium         | 1997-03-10 |
+| Sherbet Land          | 1997-03-10 |
+| Royal Raceway         | 1997-03-10 |
+| D.K.'s Jungle Parkway | 1997-03-10 |
+| Yoshi Valley          | 1997-03-07 |
+| Rainbow Road          | 1997-03-07 |
+#+end_export
+
+It seems strange finding al these shortcuts to be found on a single day. But, I double checked and it's true.
+** For how many tracks have shortcuts been discovered?
+
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+library(ascii)
+options(asciiType = "org")
+shortcutTracks <- records %>%
+  select(track, shortcut) %>%
+  filter(shortcut=="Yes") %>%
+  distinct(track)
+shortcutTracks
+count(shortcutTracks)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+:
+: Attaching package: ‘ascii’
+:
+: The following object is masked from ‘package:tidyr’:
+:
+:     expand
+:
+A tibble: 1 × 1
+
+| n <int> |
+|---------|
+| 12      |
+A tibble: 12 × 1
+
+| track <fct>           |
+|-----------------------|
+| Luigi Raceway         |
+| Kalimari Desert       |
+| Toad's Turnpike       |
+| Frappe Snowland       |
+| Choco Mountain        |
+| Mario Raceway         |
+| Wario Stadium         |
+| Sherbet Land          |
+| Royal Raceway         |
+| D.K.'s Jungle Parkway |
+| Yoshi Valley          |
+| Rainbow Road          |
+:END:
+** For which track did the world record improve the most?
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+recordDifference <- records %>%
+  group_by(shortcut, type, track) %>%
+  summarise(improvement = max(time) - min(time)) %>%
+  arrange(desc(improvement))
+recordDifference
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: `summarise()` has grouped output by 'shortcut', 'type'. You can override using the `.groups` argument.
+:
+A grouped_df: 56 × 4
+
+| shortcut <chr> | type <chr> | track <chr>           | improvement <dbl> |
+|----------------+------------+-----------------------+-------------------|
+| Yes            | Three Lap  | Rainbow Road          |            249.43 |
+| Yes            | Three Lap  | Toad's Turnpike       |            153.65 |
+| Yes            | Three Lap  | Choco Mountain        |             93.97 |
+| Yes            | Three Lap  | Wario Stadium         |             93.34 |
+| Yes            | Three Lap  | Luigi Raceway         |             91.75 |
+| Yes            | Three Lap  | Yoshi Valley          |             54.86 |
+| No             | Three Lap  | D.K.'s Jungle Parkway |             24.82 |
+| No             | Three Lap  | Rainbow Road          |             23.96 |
+| Yes            | Three Lap  | Sherbet Land          |             23.05 |
+| No             | Three Lap  | Wario Stadium         |             20.33 |
+| No             | Three Lap  | Yoshi Valley          |             18.52 |
+| No             | Three Lap  | Royal Raceway         |             15.94 |
+| No             | Three Lap  | Luigi Raceway         |             15.22 |
+| Yes            | Three Lap  | D.K.'s Jungle Parkway |             15.19 |
+| Yes            | Three Lap  | Royal Raceway         |             15.12 |
+| No             | Three Lap  | Toad's Turnpike       |             12.32 |
+| No             | Three Lap  | Choco Mountain        |             12.03 |
+| No             | Three Lap  | Banshee Boardwalk     |             11.85 |
+| No             | Three Lap  | Frappe Snowland       |             11.48 |
+| No             | Three Lap  | Kalimari Desert       |             10.28 |
+| No             | Three Lap  | Moo Moo Farm          |              9.55 |
+| Yes            | Three Lap  | Mario Raceway         |              9.43 |
+| No             | Three Lap  | Bowser's Castle       |              9.22 |
+| No             | Three Lap  | Sherbet Land          |              8.85 |
+| No             | Single Lap | Yoshi Valley          |              8.24 |
+| Yes            | Single Lap | Yoshi Valley          |              8.24 |
+| No             | Single Lap | Rainbow Road          |              8.19 |
+| Yes            | Single Lap | Rainbow Road          |              8.19 |
+| No             | Single Lap | D.K.'s Jungle Parkway |              8.03 |
+| Yes            | Single Lap | D.K.'s Jungle Parkway |              8.03 |
+| No             | Three Lap  | Mario Raceway         |              7.55 |
+| Yes            | Three Lap  | Kalimari Desert       |              7.54 |
+| No             | Single Lap | Wario Stadium         |              6.95 |
+| Yes            | Single Lap | Wario Stadium         |              6.95 |
+| No             | Three Lap  | Koopa Troopa Beach    |              6.76 |
+| Yes            | Three Lap  | Frappe Snowland       |              6.16 |
+| No             | Single Lap | Frappe Snowland       |              5.83 |
+| Yes            | Single Lap | Frappe Snowland       |              5.83 |
+| No             | Single Lap | Royal Raceway         |              5.35 |
+| Yes            | Single Lap | Royal Raceway         |              5.35 |
+| No             | Single Lap | Sherbet Land          |              4.98 |
+| Yes            | Single Lap | Sherbet Land          |              4.98 |
+| No             | Single Lap | Toad's Turnpike       |              4.15 |
+| Yes            | Single Lap | Toad's Turnpike       |              4.15 |
+| No             | Single Lap | Choco Mountain        |              4.02 |
+| Yes            | Single Lap | Choco Mountain        |              4.02 |
+| No             | Single Lap | Banshee Boardwalk     |              3.93 |
+| No             | Single Lap | Kalimari Desert       |              3.29 |
+| Yes            | Single Lap | Kalimari Desert       |              3.29 |
+| No             | Single Lap | Bowser's Castle       |              2.91 |
+| No             | Single Lap | Luigi Raceway         |              2.82 |
+| Yes            | Single Lap | Luigi Raceway         |              2.82 |
+| No             | Single Lap | Moo Moo Farm          |              2.49 |
+| No             | Single Lap | Mario Raceway         |              2.40 |
+| Yes            | Single Lap | Mario Raceway         |              2.40 |
+| No             | Single Lap | Koopa Troopa Beach    |              2.01 |
+:END:
+
+** Which track is the fastest?
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+fastestEachTrack <- records %>%
+  group_by(shortcut, type, track) %>%
+  summarize(minTrack = min(time))
+fastestEachTrack
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: `summarise()` has grouped output by 'shortcut', 'type'. You can override using the `.groups` argument.
+:
+A grouped_df: 56 × 4
+
+| shortcut <chr> | type <chr> | track <chr>           | minTrack <dbl> |
+|----------------+------------+-----------------------+----------------|
+| No             | Single Lap | Banshee Boardwalk     |          40.78 |
+| No             | Single Lap | Bowser's Castle       |          43.15 |
+| No             | Single Lap | Choco Mountain        |          38.02 |
+| No             | Single Lap | D.K.'s Jungle Parkway |          42.04 |
+| No             | Single Lap | Frappe Snowland       |          38.27 |
+| No             | Single Lap | Kalimari Desert       |          38.96 |
+| No             | Single Lap | Koopa Troopa Beach    |          30.78 |
+| No             | Single Lap | Luigi Raceway         |          37.58 |
+| No             | Single Lap | Mario Raceway         |          27.62 |
+| No             | Single Lap | Moo Moo Farm          |          27.80 |
+| No             | Single Lap | Rainbow Road          |         116.35 |
+| No             | Single Lap | Royal Raceway         |          55.50 |
+| No             | Single Lap | Sherbet Land          |          37.72 |
+| No             | Single Lap | Toad's Turnpike       |          58.69 |
+| No             | Single Lap | Wario Stadium         |          85.82 |
+| No             | Single Lap | Yoshi Valley          |          31.25 |
+| No             | Three Lap  | Banshee Boardwalk     |         124.09 |
+| No             | Three Lap  | Bowser's Castle       |         132.00 |
+| No             | Three Lap  | Choco Mountain        |         115.93 |
+| No             | Three Lap  | D.K.'s Jungle Parkway |         131.62 |
+| No             | Three Lap  | Frappe Snowland       |         119.95 |
+| No             | Three Lap  | Kalimari Desert       |         123.94 |
+| No             | Three Lap  | Koopa Troopa Beach    |          95.25 |
+| No             | Three Lap  | Luigi Raceway         |         117.77 |
+| No             | Three Lap  | Mario Raceway         |          87.51 |
+| No             | Three Lap  | Moo Moo Farm          |          85.93 |
+| No             | Three Lap  | Rainbow Road          |         351.87 |
+| No             | Three Lap  | Royal Raceway         |         171.25 |
+| No             | Three Lap  | Sherbet Land          |         115.15 |
+| No             | Three Lap  | Toad's Turnpike       |         177.80 |
+| No             | Three Lap  | Wario Stadium         |         260.01 |
+| No             | Three Lap  | Yoshi Valley          |         102.13 |
+| Yes            | Single Lap | Choco Mountain        |          38.02 |
+| Yes            | Single Lap | D.K.'s Jungle Parkway |          42.04 |
+| Yes            | Single Lap | Frappe Snowland       |          38.27 |
+| Yes            | Single Lap | Kalimari Desert       |          38.96 |
+| Yes            | Single Lap | Luigi Raceway         |          37.58 |
+| Yes            | Single Lap | Mario Raceway         |          27.62 |
+| Yes            | Single Lap | Rainbow Road          |         116.35 |
+| Yes            | Single Lap | Royal Raceway         |          55.50 |
+| Yes            | Single Lap | Sherbet Land          |          37.72 |
+| Yes            | Single Lap | Toad's Turnpike       |          58.69 |
+| Yes            | Single Lap | Wario Stadium         |          85.82 |
+| Yes            | Single Lap | Yoshi Valley          |          31.25 |
+| Yes            | Three Lap  | Choco Mountain        |          17.29 |
+| Yes            | Three Lap  | D.K.'s Jungle Parkway |          21.35 |
+| Yes            | Three Lap  | Frappe Snowland       |          23.61 |
+| Yes            | Three Lap  | Kalimari Desert       |         121.92 |
+| Yes            | Three Lap  | Luigi Raceway         |          25.30 |
+| Yes            | Three Lap  | Mario Raceway         |          58.49 |
+| Yes            | Three Lap  | Rainbow Road          |          50.38 |
+| Yes            | Three Lap  | Royal Raceway         |         119.49 |
+| Yes            | Three Lap  | Sherbet Land          |          91.65 |
+| Yes            | Three Lap  | Toad's Turnpike       |          30.31 |
+| Yes            | Three Lap  | Wario Stadium         |          14.59 |
+| Yes            | Three Lap  | Yoshi Valley          |          33.35 |
+:END:
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t :exports both
+fastestAllTracks <- fastestEachTrack %>%
+  group_by(shortcut, type) %>%
+  mutate(minTime = min(minTrack)) %>%
+  ungroup() %>%
+  filter(minTime == minTrack) %>%
+  select(shortcut, type, track, minTime)
+fastestAllTracks
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+A tibble: 4 × 4
+
+| shortcut <chr> | type <chr> | track <chr>   | minTime <dbl> |
+|----------------+------------+---------------+---------------|
+| No             | Single Lap | Mario Raceway |         27.62 |
+| No             | Three Lap  | Moo Moo Farm  |         85.93 |
+| Yes            | Single Lap | Mario Raceway |         27.62 |
+| Yes            | Three Lap  | Wario Stadium |         14.59 |
+:END:
+
+** How did the world records develop over time?
+
+*** Luigi Raceway analysis
+
+Let's first take a track and analyze it's records. Let's start with "Luigi Raceway".
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t :exports both
+library(dplyr)
+luigi <- records %>%
+  filter(track == "Luigi Raceway")
+tail(luigi, 5)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+A data.frame: 5 × 10
+
+|     | X <int> | track <chr>   | type <chr> | shortcut <chr> | player <chr> | system_played <chr> | date <chr> | time_period <chr> | time <dbl> | record_duration <int> |
+|-----+---------+---------------+------------+----------------+--------------+---------------------+------------+-------------------+------------+-----------------------|
+| 143 |     143 | Luigi Raceway | Single Lap | Yes            | VAJ          | PAL                 | 2017-01-03 | 37.61S            |      37.61 |                  1091 |
+| 144 |     144 | Luigi Raceway | Single Lap | Yes            | MR           | PAL                 | 2018-01-04 | 37.61S            |      37.61 |                   725 |
+| 145 |     145 | Luigi Raceway | Single Lap | Yes            | MR           | PAL                 | 2019-12-30 | 37.59S            |      37.59 |                   377 |
+| 146 |     146 | Luigi Raceway | Single Lap | Yes            | Dan          | PAL                 | 2021-01-10 | 37.58S            |      37.58 |                    47 |
+| 147 |     147 | Luigi Raceway | Single Lap | Yes            | MR           | PAL                 | 2021-02-06 | 37.58S            |      37.58 |                    20 |
+:END:
+
+So, we have the track records for "Luigi Raceway" and it can be seen that the last held record was by MR on 2021-02-06.
+Let's plot the time progress over Luigi track over time.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both
+library(ggplot2)
+gg <- ggplot(luigi, aes(x=date, y=time, line_type=track)) +
+  geom_point()
+plot(gg)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+#+attr_org: :width 420 :height 420
+[[file:./.ob-jupyter/02c4a48d0dba6f6a71b2a7abba0897f4133b722d.png]]
+:END:
+
+
+I can't understand the plot properly. Let me try to understand the statistics of ~luigi~ dataframe.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both :pandoc t
+summary(luigi)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+       X            track               type             shortcut
+ Min.   :  1.0   Length:147         Length:147         Length:147
+ 1st Qu.: 37.5   Class :character   Class :character   Class :character
+ Median : 74.0   Mode  :character   Mode  :character   Mode  :character
+ Mean   : 74.0
+ 3rd Qu.:110.5
+ Max.   :147.0
+    player          system_played          date           time_period
+ Length:147         Length:147         Length:147         Length:147
+ Class :character   Class :character   Class :character   Class :character
+ Mode  :character   Mode  :character   Mode  :character   Mode  :character
+
+
+
+      time        record_duration
+ Min.   : 25.30   Min.   :   0
+ 1st Qu.: 37.95   1st Qu.:   4
+ Median : 44.97   Median :  43
+ Mean   : 74.32   Mean   : 250
+ 3rd Qu.:118.06   3rd Qu.: 136
+ Max.   :132.99   Max.   :2842
+#+end_example
+
+
+From this, we can see that our date field is stored as character. Let's convert it to time field.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R
+library(lubridate)
+luigi$date <- as.Date(luigi$date)
+#+END_SRC
+
+#+RESULTS:
+: 
+: Attaching package: ‘lubridate’
+: 
+: The following objects are masked from ‘package:base’:
+: 
+:     date, intersect, setdiff, union
+: 
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R
+summary(luigi)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+       X            track               type             shortcut        
+ Min.   :  1.0   Length:147         Length:147         Length:147        
+ 1st Qu.: 37.5   Class :character   Class :character   Class :character
+ Median : 74.0   Mode  :character   Mode  :character   Mode  :character
+ Mean   : 74.0
+ 3rd Qu.:110.5
+ Max.   :147.0
+    player          system_played           date            time_period
+ Length:147         Length:147         Min.   :1997-02-15   Length:147
+ Class :character   Class :character   1st Qu.:1998-08-13   Class :character
+ Mode  :character   Mode  :character   Median :1999-09-27   Mode  :character
+                                       Mean   :2005-02-26
+                                       3rd Qu.:2013-12-28
+                                       Max.   :2021-02-11
+      time        record_duration
+ Min.   : 25.30   Min.   :   0
+ 1st Qu.: 37.95   1st Qu.:   4
+ Median : 44.97   Median :  43
+ Mean   : 74.32   Mean   : 250
+ 3rd Qu.:118.06   3rd Qu.: 136
+ Max.   :132.99   Max.   :2842
+#+end_example
+
+
+Now, that's better with the dates. Now, let's create our plot again.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :exports both
+plot(gg)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+#+attr_org: :width 420 :height 420
+[[file:./.ob-jupyter/02c4a48d0dba6f6a71b2a7abba0897f4133b722d.png]]
+:END:
+
+It feels like there are different kinds of records in here. So, the scatter plot looks like it's all messed up. We have multiple records in here. Let's see what they are. We know that there are two rows of importance for this process:
+1. Type: Single Lap, Three Lap
+2. Shortcut: Yes, No
+
+We can see that in the summary, these columns are not treated as factors which is what they are. Let's convert them to factors. Let's change it in our initial data processing as well. [[Basic data description]]
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t :exports both
+luigi$type <- factor(luigi$type)
+summary(luigi$type)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+- Single Lap :: 66Three Lap
+  81
+:END:
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :output html
+luigi$shortcut <- factor(luigi$shortcut)
+summary(luigi$shortcut)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+# [goto error]
+: Error in factor(luigi$shortcut): object 'luigi' not found
+: Traceback:
+:
+: 1. factor(luigi$shortcut)
+:END:
+
+
+So, we need to make various subplots with different kinds of records. Let's plot them in a grid with each case.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R
+gg <- ggplot(luigi, aes(x=date, y=time)) +
+  geom_point() +
+  facet_grid(shortcut ~ type)
+plot(gg)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+#+attr_org: :width 800 :height 800
+[[file:./.ob-jupyter/0c4374e296556aa40688e9f075d038041670bc8f.png]]
+:END:
+
+
+The three graphs look reasonably normal but the last one where it's three lap and using shortcut. It seems something is cooking in here. Let's take a look.
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R
+luigi_three_shortcuts <- luigi %>%
+  filter(type=="Three Lap" & shortcut=="Yes")
+plot(luigi_three_shortcuts$time)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+#+attr_org: :width 420 :height 420
+[[file:./.ob-jupyter/5f465d5765a400d566de713431706ce38aa6f1a1.png]]
+:END:
+
+However, this plot looks more reasonable than the first one.
+
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t :exports both
+luigi_three_shortcuts
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+A data.frame: 31 × 10
+
+| X <int> | track <chr>   | type <fct> | shortcut <fct> | player <chr> | system_played <chr> | date <date> | time_period <chr> | time <dbl> | record_duration <int> |
+|---------+---------------+------------+----------------+--------------+---------------------+-------------+-------------------+------------+-----------------------|
+|      84 | Luigi Raceway | Three Lap  | Yes            | Phalock      | NTSC                |  1997-05-20 | 1M 57.05S         |     117.05 |                    35 |
+|      85 | Luigi Raceway | Three Lap  | Yes            | Wonn         | NTSC                |  1997-06-24 | 1M 42.79S         |     102.79 |                    67 |
+|      86 | Luigi Raceway | Three Lap  | Yes            | Wonn         | NTSC                |  1997-08-30 | 1M 41.1S          |     101.10 |                   125 |
+|      87 | Luigi Raceway | Three Lap  | Yes            | Igor V       | PAL                 |  1998-01-02 | 1M 39.75S         |      99.75 |                   243 |
+|      88 | Luigi Raceway | Three Lap  | Yes            | Penev        | PAL                 |  1998-09-02 | 1M 38.97S         |      98.97 |                    16 |
+|      89 | Luigi Raceway | Three Lap  | Yes            | Booth        | NTSC                |  1998-09-18 | 1M 38.15S         |      98.15 |                    20 |
+|      90 | Luigi Raceway | Three Lap  | Yes            | Penev        | PAL                 |  1998-10-08 | 1M 37.82S         |      97.82 |                    77 |
+|      91 | Luigi Raceway | Three Lap  | Yes            | Jonathan     | NTSC                |  1998-12-24 | 1M 37.29S         |      97.29 |                    92 |
+|      92 | Luigi Raceway | Three Lap  | Yes            | Mike S       | NTSC                |  1999-03-26 | 1M 36.25S         |      96.25 |                    20 |
+|      93 | Luigi Raceway | Three Lap  | Yes            | Penev        | PAL                 |  1999-04-15 | 1M 35.93S         |      95.93 |                   176 |
+|      94 | Luigi Raceway | Three Lap  | Yes            | Mike S       | NTSC                |  1999-10-08 | 1M 35.39S         |      95.39 |                    25 |
+|      95 | Luigi Raceway | Three Lap  | Yes            | Zwartjes     | PAL                 |  1999-11-02 | 1M 34.74S         |      94.74 |                   383 |
+|      96 | Luigi Raceway | Three Lap  | Yes            | Penev        | PAL                 |  2000-11-19 | 1M 34.39S         |      94.39 |                  1765 |
+|      97 | Luigi Raceway | Three Lap  | Yes            | Karlo        | NTSC                |  2005-09-19 | 1M 33.22S         |      93.22 |                  2537 |
+|      98 | Luigi Raceway | Three Lap  | Yes            | Alex G       | PAL                 |  2012-08-30 | 1M 32.79S         |      92.79 |                     1 |
+|      99 | Luigi Raceway | Three Lap  | Yes            | VAJ          | PAL                 |  2012-08-31 | 1M 31.62S         |      91.62 |                  1299 |
+|     100 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2016-03-22 | 1M 29.94S         |      89.94 |                     2 |
+|     101 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2016-03-24 | 1M 27.45S         |      87.45 |                   397 |
+|     102 | Luigi Raceway | Three Lap  | Yes            | Daniel L     | PAL                 |  2017-04-25 | 1M 26.7S          |      86.70 |                  1386 |
+|     103 | Luigi Raceway | Three Lap  | Yes            | Weatherton   | NTSC                |  2021-02-09 | 1M 22.34S         |      82.34 |                     0 |
+|     104 | Luigi Raceway | Three Lap  | Yes            | Weatherton   | NTSC                |  2021-02-09 | 1M 16.21S         |      76.21 |                     0 |
+|     105 | Luigi Raceway | Three Lap  | Yes            | Weatherton   | NTSC                |  2021-02-09 | 1M 5.29S          |      65.29 |                     0 |
+|     106 | Luigi Raceway | Three Lap  | Yes            | Weatherton   | NTSC                |  2021-02-09 | 54.67S            |      54.67 |                     0 |
+|     107 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-09 | 44.97S            |      44.97 |                     0 |
+|     108 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-09 | 44.45S            |      44.45 |                     0 |
+|     109 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-09 | 42.47S            |      42.47 |                     0 |
+|     110 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-09 | 39.05S            |      39.05 |                     0 |
+|     111 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-09 | 31.43S            |      31.43 |                     0 |
+|     112 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-09 | 30S               |      30.00 |                     0 |
+|     113 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-09 | 27.47S            |      27.47 |                     2 |
+|     114 | Luigi Raceway | Three Lap  | Yes            | abney317     | NTSC                |  2021-02-11 | 25.3S             |      25.30 |                    15 |
+:END:
+
+So, we see that it's normal since abney317 was breaking his own records on the same day from 44s to 30s. So, that explains the sharp decrease.
+*** General analysis of all raceways three lap no shortcut
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :pandoc t
+three_lap_no_shortcut <- records %>%
+  filter(type=="Three Lap" & shortcut=="No")
+head(three_lap_no_shortcut, 5)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+A tibble: 5 × 10
+
+| X1 <dbl> | track <fct>   | type <fct> | shortcut <chr> | player <chr> | system_played <chr> | date <date> | time_period <chr> | time <dbl> | record_duration <dbl> |
+|----------+---------------+------------+----------------+--------------+---------------------+-------------+-------------------+------------+-----------------------|
+|        1 | Luigi Raceway | Three Lap  | No             | Salam        | NTSC                |  1997-02-15 | 2M 12.99S         |     132.99 |                     1 |
+|        2 | Luigi Raceway | Three Lap  | No             | Booth        | NTSC                |  1997-02-16 | 2M 9.99S          |     129.99 |                     0 |
+|        3 | Luigi Raceway | Three Lap  | No             | Salam        | NTSC                |  1997-02-16 | 2M 8.99S          |     128.99 |                    12 |
+|        4 | Luigi Raceway | Three Lap  | No             | Salam        | NTSC                |  1997-02-28 | 2M 6.99S          |     126.99 |                     7 |
+|        5 | Luigi Raceway | Three Lap  | No             | Gregg G      | NTSC                |  1997-03-07 | 2M 4.51S          |     124.51 |                    54 |
+:END:
+
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R
+gg <- ggplot(three_lap_no_shortcut, aes(x=date, y=time, line_type=track)) +
+  geom_point() +
+  facet_wrap(~ track, ncol=4)
+plot(gg)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+#+attr_org: :width 720 :height 600
+[[file:./.ob-jupyter/3498f1ef8d6fa2e01d1398baef7d2b5fedf27c37.png]]
+:END:
+
+From all records, we can see a lapse in between time from 2005 to 2015. There are not many records in between.
+Let's find which track has the most variance in records from start to now.
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R
+records_grouped_no_s_th_lap <- records %>%
+  filter(shortcut=="No" & type=="Three Lap")
+
+records_grouped_no_s_si_lap <- records %>%
+  filter(shortcut=="No" & type=="Single Lap")
+
+ggplot(records_grouped_no_s_th_lap, aes(x=factor(track), y=time)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+#+attr_org: :width 720 :height 600
+[[file:./.ob-jupyter/3ad0eae50a727ce294a57ceeb3026ddef294f7a0.png]]
+:END:
+
+* One time code blocks
+** Getting the data
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :eval no
+# Get the Data
+
+# Read in with tidytuesdayR package
+# Install from CRAN via: install.packages("tidytuesdayR")
+# This loads the readme and all the datasets for the week of interest
+
+# Either ISO-8601 date or year/week works!
+
+tuesdata <- tidytuesdayR::tt_load('2021-05-25')
+# tuesdata <- tidytuesdayR::tt_load(2021, week = 23)
+
+summary <- tuesdata$summary
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+--- Compiling #TidyTuesday Information for 2021-05-25 ----
+
+--- There are 2 files available ---
+
+--- Starting Download ---
+
+	Downloading file 1 of 2: `drivers.csv`
+	Downloading file 2 of 2: `records.csv`
+--- Download complete ---
+#+end_example
+
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :eval no
+print(tuesdata)
+#+END_SRC
+
+#+RESULTS:
+: Available datasets:
+: 	drivers
+: 	records
+:
+:
+** Saving the dataset
+
+We write this dataset to
+#+BEGIN_SRC jupyter-R :async yes :session r :kernel R :eval no
+write.csv(tuesdata$drivers, "datasets/05_25_21_mario_kart/drivers.csv", row.names=FALSE)
+write.csv(tuesdata$records, "datasets/05_25_21_mario_kart/records.csv", row.names=FALSE)
+#+END_SRC
+
+#+RESULTS:
